@@ -31,17 +31,39 @@ async function extrairLaptopsDaPagina(numeroPagina) {
     const avaliacao = $(elemento).find('p[data-rating]').attr('data-rating');
     const estrelas = avaliacao ? parseInt(avaliacao) : 0;
 
+    // Extraindo o link da página de detalhes do produto
+    const linkDetalhes = `https://webscraper.io${$(elemento).find('.title').attr('href')}`;
+
     // Adiciona os detalhes do laptop ao array
     laptops.push({
       titulo,
       preco,
       descricao,
       reviews,
-      estrelas
+      estrelas,
+      linkDetalhes
     });
   });
 
   return laptops;
+}
+
+// Função para extrair as opções de HDD da página do produto
+async function extrairHddDetalhes(url) {
+  const { data } = await axios.get(url);
+  const $ = cheerio.load(data);
+
+  const hddOptions = [];
+
+  // Extrair as opções de HDD disponíveis 
+  $('.swatches button').each((index, button) => {
+    if (!$(button).attr('disabled')) {
+      const hddValue = $(button).attr('value');
+      hddOptions.push(hddValue);
+    }
+  });
+
+  return hddOptions;
 }
 
 // Rota para capturar os laptops da Lenovo 
@@ -65,9 +87,15 @@ app.get('/laptops-lenovo', async (req, res) => {
         laptop.titulo.toLowerCase().includes('lenovo')
       );
 
-      // Adiciona os laptops Lenovo ao array total
-      laptopsLenovo.push(...laptopsFiltrados);
+      // Para cada laptop Lenovo, acessar a página de detalhes e extrair as opções de HDD
+      for (const laptop of laptopsFiltrados) {
+        const hddOptions = await extrairHddDetalhes(laptop.linkDetalhes);
+        laptop.hdd = hddOptions;
+        laptopsLenovo.push(laptop);
+      }
+
       numeroPagina++; // Vai para a próxima página
+  
     }
 
     // Ordena os produtos pelo preço (do mais barato para o mais caro)
